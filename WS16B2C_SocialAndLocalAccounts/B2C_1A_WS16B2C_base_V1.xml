@@ -294,16 +294,34 @@
       </ClaimType>
 
     <!-- CUSTOM additional claims -->
+      <ClaimType Id="displayNameFirstAndLast">
+        <DisplayName>DisplayName First and Last name</DisplayName>
+        <DataType>string</DataType>
+        <UserHelpText>DisplayName first name and last name.</UserHelpText>
+      </ClaimType>
+      
       <ClaimType Id="department">
         <DisplayName>Department</DisplayName>
         <DataType>string</DataType>
-        <UserHelpText>The company department to which you belong.</UserHelpText>
+        <UserHelpText>Company department to which you belong.</UserHelpText>
+        <UserInputType>TextBox</UserInputType>
       </ClaimType>
 
       <ClaimType Id="company">
         <DisplayName>Company</DisplayName>
         <DataType>string</DataType>
-        <UserHelpText>Your employeer / current company.</UserHelpText>
+        <UserHelpText>Your current company.</UserHelpText>
+        <UserInputType>TextBox</UserInputType>
+      </ClaimType>
+
+      <ClaimType Id="age">
+        <DisplayName>Age</DisplayName>
+        <DataType>string</DataType>
+        <UserHelpText>What is your age</UserHelpText>
+        <UserInputType>TextBox</UserInputType>
+        <Restriction>
+          <Pattern RegularExpression="^(?:[1-9]\d?|100)$" HelpText="Age (from 1-100, required input)" />
+        </Restriction>
       </ClaimType>
     <!-- end of CUSTOM additional claims -->
 
@@ -341,7 +359,7 @@
         </OutputClaims>
       </ClaimsTransformation>
 
-  <ClaimsTransformation Id="CreateAlternativeSecurityId" TransformationMethod="CreateAlternativeSecurityId">
+      <ClaimsTransformation Id="CreateAlternativeSecurityId" TransformationMethod="CreateAlternativeSecurityId">
         <InputClaims>
           <InputClaim ClaimTypeReferenceId="socialIdpUserId" TransformationClaimType="key" />
           <InputClaim ClaimTypeReferenceId="identityProvider" TransformationClaimType="identityProvider" />
@@ -358,24 +376,36 @@
         <OutputClaims>
           <OutputClaim ClaimTypeReferenceId="sub" TransformationClaimType="createdClaim" />
         </OutputClaims>
-    </ClaimsTransformation>
+      </ClaimsTransformation>
 
-    <!-- CUSTOM ClaimsTransformations -->
-    <ClaimsTransformation Id="CreateDisplayNameFromFirstNameLastNameCompany" TransformationMethod="FormatStringMultipleClaims">
+      <!-- CUSTOM ClaimsTransformations -->
+      <ClaimsTransformation Id="CreateDisplayNameFromFirstNameAndLastName" TransformationMethod="FormatStringMultipleClaims">
 				<InputClaims>
 					<InputClaim ClaimTypeReferenceId="givenName" TransformationClaimType="inputClaim1" />
 					<InputClaim ClaimTypeReferenceId="surname" TransformationClaimType="inputClaim2" />
-					<InputClaim ClaimTypeReferenceId="company" TransformationClaimType="inputClaim3" />
 				</InputClaims>
 				<InputParameters>
-					<InputParameter Id="stringFormat" DataType="string" Value="{1}, {0} @ {2}" />
+					<InputParameter Id="stringFormat" DataType="string" Value="{1}, {0}" />
+				</InputParameters>
+				<OutputClaims>
+					<OutputClaim ClaimTypeReferenceId="displayNameFirstAndLast" TransformationClaimType="outputClaim" />
+				</OutputClaims>
+      </ClaimsTransformation>
+
+      <ClaimsTransformation Id="CreateDisplayNameFromDisplayNameAndCompany" TransformationMethod="FormatStringMultipleClaims">
+				<InputClaims>
+					<InputClaim ClaimTypeReferenceId="displayNameFirstAndLast" TransformationClaimType="inputClaim1" />
+          <InputClaim ClaimTypeReferenceId="givenName" TransformationClaimType="inputClaim2" /> 
+				</InputClaims>
+				<InputParameters>
+					<InputParameter Id="stringFormat" DataType="string" Value="{0} @ {1}" />
 				</InputParameters>
 				<OutputClaims>
 					<OutputClaim ClaimTypeReferenceId="displayName" TransformationClaimType="outputClaim" />
 				</OutputClaims>
-    </ClaimsTransformation>
-    <!-- end of CUSTOM ClaimsTransformations -->
- 
+      </ClaimsTransformation>
+      <!-- end of CUSTOM ClaimsTransformations -->
+
     </ClaimsTransformations>
 
     <ClientDefinitions>
@@ -493,6 +523,12 @@
             <!-- Policy Engine Clients -->
             <Item Key="UsePolicyInRedirectUri">false</Item>
             <Item Key="HttpBinding">POST</Item>
+            
+            <!-- DEPLOY / CUSTOM client_id=ProxyIdentityExperience idTokenAudience=IdentityExperience key section -->
+            <Item Key="client_id">13184461-142a-46e1-87f7-22fac723e294</Item>
+            <Item Key="IdTokenAudience">66b8fea5-a389-46e6-abda-46b3cc4ee284</Item>
+            <!-- end of DEPLOY / CUSTOM client_id=ProxyIdentityExperience idTokenAudience=IdentityExperience section -->
+
           </Metadata>
           <InputClaims>
             <InputClaim ClaimTypeReferenceId="signInName" PartnerClaimType="username" Required="true" />
@@ -500,6 +536,12 @@
             <InputClaim ClaimTypeReferenceId="grant_type" DefaultValue="password" />
             <InputClaim ClaimTypeReferenceId="scope" DefaultValue="openid" />
             <InputClaim ClaimTypeReferenceId="nca" PartnerClaimType="nca" DefaultValue="1" />
+
+            <!-- DEPLOY / CUSTOM client_id=ProxyIdentityExperience idTokenAudience=IdentityExperience section -->
+            <InputClaim ClaimTypeReferenceId="client_id" DefaultValue="13184461-142a-46e1-87f7-22fac723e294" />
+            <InputClaim ClaimTypeReferenceId="resource_id" PartnerClaimType="resource" DefaultValue="66b8fea5-a389-46e6-abda-46b3cc4ee284" />
+            <!-- end of DEPLOY / CUSTOM client_id=ProxyIdentityExperience idTokenAudience=IdentityExperience section -->
+
           </InputClaims>
           <OutputClaims>
             <OutputClaim ClaimTypeReferenceId="objectId" PartnerClaimType="oid" />
@@ -517,7 +559,6 @@
     <ClaimsProvider>
       <DisplayName>Self Asserted</DisplayName>
       <TechnicalProfiles>
-
         <TechnicalProfile Id="SelfAsserted-Social">
           <DisplayName>User ID signup</DisplayName>
           <Protocol Name="Proprietary" Handler="Web.TPEngine.Providers.SelfAssertedAttributeProvider, Web.TPEngine, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null" />
@@ -531,8 +572,11 @@
           <!-- end of DEPLOY / CUSTOM Extended Policy Framework secret section -->
 
           </CryptographicKeys>
+           <InputClaimsTransformations>
+            <InputClaimsTransformation ReferenceId="CreateDisplayNameFromFirstNameAndLastName" />
+            <InputClaimsTransformation ReferenceId="CreateDisplayNameFromDisplayNameAndCompany" />
+          </InputClaimsTransformations>
           <InputClaims>
-
             <!-- These claims ensure that any values retrieved in the previous steps (e.g. from an external IDP) are prefilled. 
                  Note that some of these claims may not have any value, for example, if the external IDP did not provide any of
                  these values, or if the claim did not appear in the OutputClaims section of the IDP.
@@ -541,10 +585,10 @@
             <InputClaim ClaimTypeReferenceId="displayName" />
             <InputClaim ClaimTypeReferenceId="givenName" />
             <InputClaim ClaimTypeReferenceId="surname" />
-            <InputClaim ClaimTypeReferenceId="department" />
+            <InputClaim ClaimTypeReferenceId="company" DefaultValue="Lum@G8" />
+            <InputClaim ClaimTypeReferenceId="department" DefaultValue="Identity" />
           </InputClaims>
           <OutputClaims>
-
             <!-- These claims are not shown to the user because their value is obtained through the "ValidationTechnicalProfiles"
                  referenced below, or a default value is assigned to the claim. A claim is only shown to the user to provide a 
                  value if its value cannot be obtained through any other means. -->
@@ -558,6 +602,9 @@
             <OutputClaim ClaimTypeReferenceId="displayName" />
             <OutputClaim ClaimTypeReferenceId="givenName" />
             <OutputClaim ClaimTypeReferenceId="surname" />
+            <OutputClaim ClaimTypeReferenceId="age" Required="true" />
+            <OutputClaim ClaimTypeReferenceId="company" />
+            <OutputClaim ClaimTypeReferenceId="department" />
           </OutputClaims>
           <ValidationTechnicalProfiles>
             <ValidationTechnicalProfile ReferenceId="AAD-UserWriteUsingAlternativeSecurityId" />
@@ -581,6 +628,9 @@
                  ValidationTechnicalProfile referenced below so it can be written to directory after being updateed by the user, i.e. AAD-UserWriteProfileUsingObjectId. -->
             <InputClaim ClaimTypeReferenceId="givenName" />
             <InputClaim ClaimTypeReferenceId="surname" />
+            <!-- <InputClaim ClaimTypeReferenceId="age" />
+            <InputClaim ClaimTypeReferenceId="company" />
+            <InputClaim ClaimTypeReferenceId="department" /> -->
           </InputClaims>
           <OutputClaims>
             <!-- Required claims -->
@@ -590,6 +640,9 @@
                  ValidationTechnicalProfile referenced below so it can be written to directory after being updateed by the user, i.e. AAD-UserWriteProfileUsingObjectId. -->
             <OutputClaim ClaimTypeReferenceId="givenName" />
             <OutputClaim ClaimTypeReferenceId="surname" />
+            <OutputClaim ClaimTypeReferenceId="age" />
+            <OutputClaim ClaimTypeReferenceId="company" />
+            <OutputClaim ClaimTypeReferenceId="department" />
           </OutputClaims>
           <ValidationTechnicalProfiles>
             <ValidationTechnicalProfile ReferenceId="AAD-UserWriteProfileUsingObjectId" />
@@ -599,33 +652,8 @@
     </ClaimsProvider>
 
     <ClaimsProvider>
-      <DisplayName>Local Account SignIn</DisplayName>
-      <TechnicalProfiles>
-        <TechnicalProfile Id="login-NonInteractive">
-          <Metadata>
-            
-            <!-- DEPLOY / CUSTOM client_id idTokenAudience key section -->
-            <Item Key="client_id">13184461-142a-46e1-87f7-22fac723e294</Item>
-            <Item Key="IdTokenAudience">66b8fea5-a389-46e6-abda-46b3cc4ee284</Item>
-            <!-- end of DEPLOY / CUSTOM client_id idTokenAudience section -->
-
-          </Metadata>
-          <InputClaims>
-
-            <!-- DEPLOY / CUSTOM client_id resource_id section -->
-            <InputClaim ClaimTypeReferenceId="client_id" DefaultValue="13184461-142a-46e1-87f7-22fac723e294" />
-            <InputClaim ClaimTypeReferenceId="resource_id" PartnerClaimType="resource" DefaultValue="66b8fea5-a389-46e6-abda-46b3cc4ee284" />
-            <!-- end of DEPLOY / CUSTOM client_id resource_id section -->
-
-          </InputClaims>
-        </TechnicalProfile>
-      </TechnicalProfiles>
-    </ClaimsProvider>
-
-    <ClaimsProvider>
       <DisplayName>Local Account</DisplayName>
       <TechnicalProfiles>
-
         <TechnicalProfile Id="LocalAccountSignUpWithLogonEmail">
           <DisplayName>Email signup</DisplayName>
           <Protocol Name="Proprietary" Handler="Web.TPEngine.Providers.SelfAssertedAttributeProvider, Web.TPEngine, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null" />
@@ -645,6 +673,13 @@
           <InputClaims>
             <InputClaim ClaimTypeReferenceId="email" />
           </InputClaims>
+
+          <PersistedClaims>
+            <PersistedClaim ClaimTypeReferenceId="age" />
+            <PersistedClaim ClaimTypeReferenceId="company" />
+            <PersistedClaim ClaimTypeReferenceId="department" />
+          </PersistedClaims>
+
           <OutputClaims>
             <OutputClaim ClaimTypeReferenceId="objectId" />
             <OutputClaim ClaimTypeReferenceId="email" PartnerClaimType="Verified.Email" Required="true" />
@@ -658,6 +693,9 @@
             <OutputClaim ClaimTypeReferenceId="displayName" />
             <OutputClaim ClaimTypeReferenceId="givenName" />
             <OutputClaim ClaimTypeReferenceId="surName" />
+            <OutputClaim ClaimTypeReferenceId="age" Required="true" />
+            <OutputClaim ClaimTypeReferenceId="company" />
+            <OutputClaim ClaimTypeReferenceId="department" />
           </OutputClaims>
           <ValidationTechnicalProfiles>
             <ValidationTechnicalProfile ReferenceId="AAD-UserWriteUsingLogonEmail" />
@@ -829,10 +867,9 @@
         </TechnicalProfile>
       </TechnicalProfiles>
     </ClaimsProvider>
-  </ClaimsProviders>
 
     <!-- CUSTOM ClaimsProviders -->
-  <ClaimsProvider>
+    <ClaimsProvider>
         <Domain>onmicrosoft.com</Domain>
         <DisplayName>AzureActiveDirectory</DisplayName>
         <TechnicalProfiles>
@@ -881,7 +918,6 @@
                     <OutputClaimsTransformation ReferenceId="CreateUserPrincipalName"/>
                     <OutputClaimsTransformation ReferenceId="CreateAlternativeSecurityId"/>
                     <OutputClaimsTransformation ReferenceId="CreateSubjectClaimFromAlternativeSecurityId"/>
-        						<OutputClaimsTransformation ReferenceId="CreateDisplayNameFromFirstNameLastnameCompany" />
                 </OutputClaimsTransformations>
                 <UseTechnicalProfileForSessionManagement ReferenceId="SM-Noop"/>
             </TechnicalProfile>
@@ -889,7 +925,6 @@
     </ClaimsProvider>
 
     <ClaimsProvider>
-
       <Domain>facebook.com</Domain>
       <DisplayName>Facebook</DisplayName>
       <TechnicalProfiles>
@@ -1001,14 +1036,23 @@
     <ClaimsProvider>
       <DisplayName>Azure Active Directory</DisplayName>
       <TechnicalProfiles>
+
         <TechnicalProfile Id="AAD-Common">
           <DisplayName>Azure Active Directory</DisplayName>
           <Protocol Name="Proprietary" Handler="Web.TPEngine.Providers.AzureActiveDirectoryProvider, Web.TPEngine, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null" />
+
+            <!-- DEPLOY / CUSTOM objectId and appId properties extension section -->
+            <Metadata>
+              <Item Key="ApplicationObjectId">06f0a488-adb2-4064-8156-835a9561db27</Item>
+              <Item Key="ClientId">b9a321fb-6dff-4cbe-ab04-aec99c7eb5d2</Item>
+            </Metadata>
+            <!-- end of DEPLOY / CUSTOM objectId and appId properties extension section -->
+
           <CryptographicKeys>
 
             <!-- DEPLOY / CUSTOM Extended Policy Framework secret section -->
             <Key Id="issuer_secret" StorageReferenceId="B2C_1A_TokenSigningKeyContainerWS16" />
-          <!-- end of DEPLOY / CUSTOM Extended Policy Framework secret section -->
+            <!-- end of DEPLOY / CUSTOM Extended Policy Framework secret section -->
 
           </CryptographicKeys>
 
@@ -1038,7 +1082,8 @@
             <PersistedClaim ClaimTypeReferenceId="userPrincipalName" />
             <PersistedClaim ClaimTypeReferenceId="mailNickName" DefaultValue="unknown" />
             <PersistedClaim ClaimTypeReferenceId="displayName" DefaultValue="unknown" />
-  
+            <PersistedClaim ClaimTypeReferenceId="age" PartnerClaimType="extension_age" />
+            
             <!-- Optional claims -->
             <PersistedClaim ClaimTypeReferenceId="otherMails" />
             <PersistedClaim ClaimTypeReferenceId="givenName" />
@@ -1120,6 +1165,34 @@
           <UseTechnicalProfileForSessionManagement ReferenceId="SM-AAD" />
         </TechnicalProfile>
 
+      <!-- CUSTOM technical profile for writing custom attributes -->
+        <TechnicalProfile Id="AAD-UserWriteCustomAttributes">
+          <Metadata>
+            <Item Key="Operation">Write</Item>
+            <Item Key="RaiseErrorIfClaimsPrincipalAlreadyExists">true</Item>
+          </Metadata>
+          <IncludeInSso>false</IncludeInSso>
+          <InputClaims>
+            <InputClaim ClaimTypeReferenceId="objectId" Required="true" />
+          </InputClaims>
+          <PersistedClaims>
+            <PersistedClaim ClaimTypeReferenceId="displayName" />
+            <PersistedClaim ClaimTypeReferenceId="age" />
+            <PersistedClaim ClaimTypeReferenceId="company" />
+            <PersistedClaim ClaimTypeReferenceId="department" />
+          </PersistedClaims>
+          <OutputClaims>
+            <OutputClaim ClaimTypeReferenceId="objectId" />
+            <OutputClaim ClaimTypeReferenceId="displayName" />
+            <OutputClaim ClaimTypeReferenceId="age" />
+            <OutputClaim ClaimTypeReferenceId="company" />
+            <OutputClaim ClaimTypeReferenceId="department" />
+          </OutputClaims>
+
+          <IncludeTechnicalProfile ReferenceId="AAD-UserReadUsingObjectId" />
+        </TechnicalProfile>
+      <!-- end of CUSTOM technical profile for writing custom attributes -->
+
         <TechnicalProfile Id="AAD-UserReadUsingEmailAddress">
           <Metadata>
             <Item Key="Operation">Read</Item>
@@ -1181,6 +1254,10 @@
             <!-- Optional claims -->
             <PersistedClaim ClaimTypeReferenceId="givenName" />
             <PersistedClaim ClaimTypeReferenceId="surname" />
+            <PersistedClaim ClaimTypeReferenceId="displayName" />
+            <PersistedClaim ClaimTypeReferenceId="age" />
+            <PersistedClaim ClaimTypeReferenceId="company" />
+            <PersistedClaim ClaimTypeReferenceId="department" />
           </PersistedClaims>
           <IncludeTechnicalProfile ReferenceId="AAD-Common" />
         </TechnicalProfile>
@@ -1205,10 +1282,17 @@
             <OutputClaim ClaimTypeReferenceId="surname" />
             <OutputClaim ClaimTypeReferenceId="alternativeSecurityId" />            
           </OutputClaims>
+
+           <OutputClaimsTransformations>
+            <OutputClaimsTransformation ReferenceId="CreateDisplayNameFromFirstNameAndLastName" />
+            <OutputClaimsTransformation ReferenceId="CreateDisplayNameFromDisplayNameAndCompany" />
+          </OutputClaimsTransformations>
+
           <IncludeTechnicalProfile ReferenceId="AAD-Common" />
         </TechnicalProfile>
 
       </TechnicalProfiles>
     </ClaimsProvider>
+  </ClaimsProviders>
 
 </TrustFrameworkPolicy>
