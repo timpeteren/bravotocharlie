@@ -1,23 +1,35 @@
 <#
 .SYNOPSIS
-    Uploads or downloads files from a local folder to an Azure storage container.
+    Uploads or downloads files from a local folder to an Azure storage account blob container.
 .DESCRIPTION
-    The script was created to be used in a release pipeline for deploying AAD B2C custom branding files.
-    However, the script was also created to handle direct excecution.
-    To run script in a shell fill out varialbes in '#region Manually configured variables'.
+    The script was created for use in a release pipeline, for deployment of AAD B2C custom branding files to an Azure storage account container.
+    Used in a pipeline, service principal credentials must be provided in context of the running pipeline.
+    
+    However, the script has been extended to also handle direct excecution.
+    With direct execution the script runs in the context of a user account.
+    When run in a shell the script can be configured either way:
+        a) Provide variables as parameters when executing (as for pipeline execution)
+        b) Fill out variables in '#region Manually configured variables'.
 .NOTES
+    21.07.22:
     Script implements SupportsShouldProcess and can be used with -WhatIf and -Confirm.
 .EXAMPLE
-    .\B2C-BlobManagement.ps1 -TenantId xxx -Upload $true -Download $false -Subscription sub -ResourcGroup rg -StorageAccountName sa
+    .\B2C-BlobManagement.ps1 -EnvPrefix d/t/p -Upload $true -Download $false -Subscription sub -ResourcGroup rg -StorageAccountName sa -ClientId xxx -ClientSecret yyy
+
     Executed from a release pipeline, all variables will have to be assigned on the command line and principal must have requisite permissions to resources.
 .EXAMPLE
-    .\B2C-BlobManagement.ps1 -EnvPrefix d (-WhatIf)
-    If all required parameters have been set in the script file it can be executed with only -EnvPrefix parameter (also add -WhatIf to see what will happen).
+    .\B2C-BlobManagement.ps1 -EnvPrefix d/t/p -Download:$true -Upload:$false -DestinationFolder C:\GIT\Destination (-WhatIf)
+
+    If all required parameters have been set in 'Manually configured variables' the script can be executed with only -EnvPrefix parameter (add -WhatIf to see what will happen).
+    It is recommended to excplicitly configure -Upload and -Download params on the command line (default setting is $Upload:$true and $Download:$false).
+    If provided as an input param -DestinationFolder will superseed settings in 'Manually configured variables'.
     The script will prompt for user credentials.
 .EXAMPLE
-    .\B2C-BlobManagement.ps1 -EnvPrefix d -Username myUser@myDomain.com
+    .\B2C-BlobManagement.ps1 -EnvPrefix d/t/p -Username myUser@myDomain.com -Upload:$true -Download:$false -SourceFolder C:\GIT\Source (-WhatIf)
+
     As If all required parameters have been set in the script file it can be executed with only -EnvPrefix, add -Username to avoid account picker.
-    Include -Username to directly select a specific user to sign in with.
+    Include -Username to directly select a specific user to sign in with, if script halts because user has no existing session look for a credentials prompt window.
+    If provided as an input param -SourceFolder will superseed settings in 'Manually configured variables'.
 #>
 
 [CmdletBinding(SupportsShouldProcess=$true)]
@@ -25,7 +37,7 @@ param (
     # Account name to connect to Azure AD tenant
     [Parameter(Mandatory=$false)]
     [String] $Username,
-    # Environment prefix for Azure AD tenant (only used with direct execution)
+    # Environment prefix for Azure AD tenant
     [Parameter(Mandatory=$false)]
     [String] $EnvPrefix,
     # Azure AD tenant identifier
@@ -63,9 +75,6 @@ param (
 # Get-PackageProvider -Name Nuget
 # Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Scope CurrentUser -Force # -WhatIf
 # Install-Module -Name Az.Storage -Scope CurrentUser -Force # -WhatIf
-
-# Null values to make sure no values linger if running multiple times against different environments
-# $ContainerOverride, $Subscription, $ResourceGroup, $StorageAccountName, $StorageAccountKey, $DestinationFolder, $SourceFolder = $null
 
 #region Manually configured variables
 $TenantIdentifier = ""
