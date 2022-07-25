@@ -21,16 +21,16 @@ $FullDetails = New-Object System.Collections.ArrayList
 $ObjectsToCompare.$($identifier) | ForEach-Object {
     $Result = Get-MgUser -Filter "identities/any(c:c/issuerAssignedId eq '$($_)' and c/issuer eq 'something.no')" -Property *
     Write-Verbose "Email: $($Result | Select-Object -ExpandProperty identities | Where-Object { $_.SignInType -eq 'emailAddress' } | Select-Object -ExpandProperty IssuerAssignedId), `
-                    VyId: $($_), `
-                    EnturId: $($Result | ForEach-Object { $_.AdditionalProperties["$extensionAttribute"] } | Select-Object -First 1), `
+                    MyId: $($_), `
+                    ThatId: $($Result | ForEach-Object { $_.AdditionalProperties["$extensionAttribute"] } | Select-Object -First 1), `
                     B2CObjectId: $($Result.Id)" `
                     -Verbose
 
     if ($Result) {
         $FullDetails.Add( [PSCustomObject] @{
             Email = $Result | Select-Object -ExpandProperty identities | Where-Object { $_.SignInType -eq 'emailAddress' } | Select-Object -ExpandProperty IssuerAssignedId
-            VyId = $_
-            EnturId = $Result | ForEach-Object { $_.AdditionalProperties["$extensionAttribute"] } | Select-Object -First 1
+            MyId = $_
+            ThatId = $Result | ForEach-Object { $_.AdditionalProperties["$extensionAttribute"] } | Select-Object -First 1
             B2CObjectId = $Result.Id
         }) | Out-Null
         Write-Verbose "$($_) was added" -Verbose
