@@ -1,5 +1,5 @@
-# Written by Lars-Jo Røsberg, TietoEvry
-# Modified by Tim Peter Edstrøm, TietoEvry
+# Written by Lars-Jo Røsberg, @larsjoR
+# Modified by Tim Peter Edstrøm, @timpeteren
 #
 # Script snippet, using PowerShell Graph SDK to search for users
 #
