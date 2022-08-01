@@ -13,6 +13,11 @@
 .NOTES
     Written by Tim Peter Edstrøm, @timpeteren
 
+    31.07.22:
+    - Remove $EnvPrefix as required parameter for running script in a pipeline (only for local user context excecution of script).
+    30.07.22:
+    - Add check of $ContainerName variable to verify the existance of the container.
+    - Update -Delete method for more efficient execution.
     25.07.22:
     - Improve output for running in pipeline.
     - Expand -EnvPrefix support to recognize following parameters: d + dev + development, t + test + test, p + prod + production
@@ -25,12 +30,12 @@
     - Script must be run in context of an authenticated user.
     - Script implements SupportsShouldProcess and can be used with -WhatIf and -Confirm.
 .EXAMPLE
-    .\B2C-BlobManagement.ps1 -EnvPrefix d/t/p -TenantId tid -Subscription sub -ClientId id -ClientSecret secret -Subscription sub -ResourcGroup rg -StorageAccountName sa -ContainerName container -SourceFolder pathToFolder
+    .\B2C-BlobManagement.ps1 -TenantId tid -Subscription sub -ClientId id -ClientSecret secret -Subscription sub -ResourcGroup rg -StorageAccountName sa -ContainerName container -SourceFolder pathToFolder
 
     Executed from a release pipeline, all variables will have to be assigned on the command line and principal must have requisite permissions to resources.
     Files in source directory will be uploaded, -Upload $true -Download $false doesn't have to be provided as upload is the default script behaviour.
 .EXAMPLE
-    .\B2C-BlobManagement.ps1 -EnvPrefix d/t/p -Upload $true -Download $false -Subscription sub -ResourcGroup rg -StorageAccountName sa
+    .\B2C-BlobManagement.ps1 -Upload $true -Download $false -Subscription sub -ResourcGroup rg -StorageAccountName sa
 
     TenantId, ClientId and ClientSecret can be read from $ENV: (environment) variables by matching param() default values.
 .EXAMPLE
@@ -51,18 +56,18 @@
 [CmdletBinding(SupportsShouldProcess = $true)]
 param (
     # Name of Azure tenant
-    [Parameter(Mandatory=$false)]
-    [string]$TenantId = $ENV:AAD_TENANT_ID,
+    [Parameter(Mandatory = $false)]
+    [string]$TenantId = $ENV:BRANDING_STORAGE_ACCOUNT_TENANTID,
     # App registration identifier    
-    [Parameter(Mandatory=$false)]
-    [string]$ClientId = $ENV:APP_REGISTRATION_CLIENTID,
+    [Parameter(Mandatory = $false)]
+    [string]$ClientId = $ENV:CONTENT_DEPLOYMENT_APP_REGISTRATION_CLIENTID,
     # App registration secret
-    [Parameter(Mandatory=$false)]
-    [string]$ClientSecret = $ENV:APP_REGISTRATION_CLIENTSECRET,
+    [Parameter(Mandatory = $false)]
+    [string]$ClientSecret = $ENV:CONTENT_DEPLOYMENT_APP_REGISTRATION_CLIENTSECRET,
     # Account name to connect to Azure AD
     [Parameter(Mandatory = $false)]
     [String] $Username,
-    # Environment prefix for Azure AD
+    # Environment prefix for Azure AD (only used when running script in user context)
     [Parameter(Mandatory = $false)]
     [String] $EnvPrefix,
     # If script should upload files to storage container
@@ -107,7 +112,7 @@ param (
 $ContainerOverride #= "branding"
 $UploadOverride #= $true
 $DownloadOverride #= $false
-$NoTestPreReqs #= $true
+$NoTestPreReqsOverride #= $true
 
 # Container name, folder names and storage account names for various B2C environments
 $DestinationFolderD = "C:\GIT\ProjectX\branding dev"
@@ -127,24 +132,26 @@ $SourceFolderP = "C:\GIT\ProjectX\branding prod"
 $StorageAccountNameP = "storageAccountProd"
 $ResourceGroupP = "resourceGroupProd"
 $SubscriptionP = "p"
-#endregion
 
-# For local execution, REMEMBER to change these settings to reflect the environment to access D = dev / T = test / P = prod 
-$EnvPrefix = $EnvPrefix.ToLower()
-if (-not ($EnvPrefix -and ($EnvPrefix -eq "d" -or $EnvPrefix -eq "dev" -or $EnvPrefix -eq "development" -or $EnvPrefix -eq "t" -or $EnvPrefix -eq "test" -or $EnvPrefix -eq "p" -or $EnvPrefix -eq "prod" -or $EnvPrefix -eq "production")) ) {
-    $EnvPrefix = Read-Host -Prompt "Specify environment: d / t / p"
-    if (-not ($EnvPrefix -eq "d" -or $EnvPrefix -eq "t" -or $EnvPrefix -eq "p")) {
-        Write-Host "Did you really enter d, t or p when prompted?!?!" -ForegroundColor Red; Read-Host
+# Omit setting variables based $EnvPrefix if run in pipeline (assuming $ClientId and $ClientSecret only will be used for running in pipeline)
+if (-not ($ClientId -and $ClientSecret)) {
+    $EnvPrefix = $EnvPrefix.ToLower()
+    # For local execution, REMEMBER to change these settings to reflect the environment to access D = dev / T = test / P = prod 
+    if (-not ($EnvPrefix -and ($EnvPrefix -eq "d" -or $EnvPrefix -eq "dev" -or $EnvPrefix -eq "development" -or $EnvPrefix -eq "t" -or $EnvPrefix -eq "test" -or $EnvPrefix -eq "p" -or $EnvPrefix -eq "prod" -or $EnvPrefix -eq "production")) ) {
+        $EnvPrefix = Read-Host -Prompt "Specify environment: d / t / p"
+        if (-not ($EnvPrefix -eq "d" -or $EnvPrefix -eq "t" -or $EnvPrefix -eq "p")) {
+            Write-Host "Did you really enter d, t or p when prompted?!?!" -ForegroundColor Red; Read-Host
+        }
     }
+    # Set variables according to environment, check which input parameters have been provided at execution
+    if ($EnvPrefix -eq "d" -or $EnvPrefix -eq "dev" -or $EnvPrefix -eq "development") { if (-not $Subscription) { $Subscription = $SubscriptionD }; if (-not $ResourceGroup) { $ResourceGroup = $ResourceGroupD }; if (-not $StorageAccountName) { $StorageAccountName = $StorageAccountNameD }; if (-not $SourceFolder) { $SourceFolder = $SourceFolderD }; if (-not $DestinationFolder) { $DestinationFolder = $DestinationFolderD } }
+    if ($EnvPrefix -eq "t" -or $EnvPrefix -eq "test") { if (-not $Subscription) { $Subscription = $SubscriptionT }; if (-not $ResourceGroup) { $ResourceGroup = $ResourceGroupT }; if (-not $StorageAccountName) { $StorageAccountName = $StorageAccountNameT }; if (-not $SourceFolder) { $SourceFolder = $SourceFolderT }; if (-not $DestinationFolder) { $DestinationFolder = $DestinationFolderT } }
+    if ($EnvPrefix -eq "p" -or $EnvPrefix -eq "prod" -or $EnvPrefix -eq "production") { if (-not $Subscription) { $Subscription = $SubscriptionP }; if (-not $ResourceGroup) { $ResourceGroup = $ResourceGroupP }; if (-not $StorageAccountName) { $StorageAccountName = $StorageAccountNameP }; if (-not $SourceFolder) { $SourceFolder = $SourceFolderP }; if (-not $DestinationFolder) { $DestinationFolder = $DestinationFolderP } }
+    if ($ContainerOverride) { $ContainerName = $ContainerOverride }
+    if ($UploadOverride) { $Upload = $UploadOverride }
+    if ($DownloadOverride) { $Download = $DownloadOverride }
 }
-
-# Set variables according to environment, check which input parameters have been provided at execution
-if ($EnvPrefix -eq "d" -or $EnvPrefix -eq "dev" -or $EnvPrefix -eq "development") { if (-not $Subscription) { $Subscription = $SubscriptionD }; if (-not $ResourceGroup) { $ResourceGroup = $ResourceGroupD }; if (-not $StorageAccountName) { $StorageAccountName = $StorageAccountNameD }; if (-not $SourceFolder) { $SourceFolder = $SourceFolderD }; if (-not $DestinationFolder) { $DestinationFolder = $DestinationFolderD } }
-if ($EnvPrefix -eq "t" -or $EnvPrefix -eq "test") { if (-not $Subscription) { $Subscription = $SubscriptionT }; if (-not $ResourceGroup) { $ResourceGroup = $ResourceGroupT }; if (-not $StorageAccountName) { $StorageAccountName = $StorageAccountNameT }; if (-not $SourceFolder) { $SourceFolder = $SourceFolderT }; if (-not $DestinationFolder) { $DestinationFolder = $DestinationFolderT } }
-if ($EnvPrefix -eq "p" -or $EnvPrefix -eq "prod" -or $EnvPrefix -eq "production") { if (-not $Subscription) { $Subscription = $SubscriptionP }; if (-not $ResourceGroup) { $ResourceGroup = $ResourceGroupP }; if (-not $StorageAccountName) { $StorageAccountName = $StorageAccountNameP }; if (-not $SourceFolder) { $SourceFolder = $SourceFolderP }; if (-not $DestinationFolder) { $DestinationFolder = $DestinationFolderP } }
-if ($ContainerOverride) { $ContainerName = $ContainerOverride }
-if ($UploadOverride) { $Upload = $UploadOverride }
-if ($DownloadOverride) { $Download = $DownloadOverride }
+#endregion
 
 # Check for pre-requisite modules (and Nuget package manager) for running script
 function Test-RequiredModules {
@@ -158,10 +165,10 @@ function Test-RequiredModules {
         
     # Pre-requisite modules check and installation of missing packages
     if ($Modules) {
-        Write-Host "`n[group]Checking for pre-requisite module(s)..."
+        Write-Host "[group]Checking for pre-requisite module(s)..."
         # Checking for Nuget package manager required for package installation
         if (-not (Get-PackageProvider -Name "Nuget")) {
-            Write-Host "`nFirst, installing package provider Nuget..."
+            Write-Host "First, installing package provider Nuget..."
             Install-PackageProvider -Name NuGet -MinimumVersion 3.0.0.1 -Scope CurrentUser -Force | Out-Null
         }
         foreach ($mod in $Modules) {
@@ -180,26 +187,28 @@ function Test-RequiredModules {
 }
 
 # Test for existance of required modules and install if missing
-if ($NoTestPreReqs -ne $true) { 
+if ($NoTestPreReqs -ne $true -and $NoTestPreReqsOverride -ne $true) {
     Test-RequiredModules -Modules "Az.Accounts", "Az.Storage"
 }
 
-if ($ENV:CONTENT_DEPLOYMENT_APP_REGISTRATION_CLIENTID -and $ENV:CONTENT_DEPLOYMENT_APP_REGISTRATION_CLIENTSECRET) {
+# If app principal id and secret is provided, use access_token to connect to ARM
+if ($ClientId -and $ClientSecret) {
     try {
         # Connect to Azure with service principal
-        Write-Host "`nGetting an access_token to Azure resource manager..."
+        Write-Host "Getting an access_token to Azure resource manager..."
         $uri = "https://login.microsoftonline.com/{0}/oauth2/v2.0/token" -f $TenantId
         $body = "scope=https://management.core.windows.net/.default&client_id=$($ClientId)&grant_type=client_credentials&client_secret={0}" -f [System.Net.WebUtility]::UrlEncode($ClientSecret)
         $token = Invoke-RestMethod -Method Post -Uri $uri -Body $body -ContentType "application/x-www-form-urlencoded" -ErrorAction Stop
         
-        Write-Host "`nConnecting to Azure..."
-        Connect-AzAccount -AccountId $ClientId -Subscription $Subscription -AccessToken $($token.access_token) -ErrorAction Stop
+        Write-Host "Connecting to Azure..."
+        Connect-AzAccount -AccountId $ClientId -Subscription $Subscription -AccessToken $($token.access_token) -ErrorAction Stop | Out-Null
     }
     catch {
         Write-Warning "Could not authenticate with service principal. Aborting..."
         break;
     }
 }
+# If app principal id and secret is NOT provided, initiate user context to connect to ARM
 else {
     # Connect to Azure with user account
     try {
@@ -207,11 +216,11 @@ else {
         $WarningPreference = "SilentlyContinue"
         if ($Username) {
             # Set warning preference to avoid output of other subscriptions, add | Out-Null to remove standard successful Connect-AzAccount output
-            Write-Host "`nConnecting to Azure with user account..."
-            Connect-AzAccount -Subscription $Subscription -AccountId $Username
+            Write-Host "Connecting to Azure with user account..."
+            Connect-AzAccount -Subscription $Subscription -AccountId $Username | Out-Null
         }
         else {
-            Connect-AzAccount -Subscription $Subscription
+            Connect-AzAccount -Subscription $Subscription | Out-Null
         }
         $WarningPreference = $WarnPrefPop
     }
@@ -319,7 +328,7 @@ function Set-CacheControl {
 #region DOWNLOAD : Download blobs from storage container
 #
 if ($Download -eq $false) {
-    Write-Host "`n`$Download set to `$false, skipping step..."
+    Write-Host "`$Download set to `$false, skipping step..."
 }
 else {
     # Create local folder if it does not already exist
@@ -328,16 +337,28 @@ else {
         # Script implements SupportsShouldProcess and can therefore be run with -WhatIf and -Confirm parameters
         if ($PSCmdlet.ShouldProcess($($StorageAccountName), 'Downloading custom branding')) {
             try {
-                Write-Host "`n`$Download is `$true - starting download procedure."
+                Write-Host "`$Download is `$true - starting download procedure."
                 $Context = Get-StorageAccountContext -ResourceGroup $ResourceGroup -StorageAccountName $StorageAccountName
+
+                # Check for existance of branding container $ContainerName
+                if (-not (Get-AzStorageContainer -Name $ContainerName -Context $Context -ErrorAction SilentlyContinue)) {
+                    Write-Warning "Variable `$ContainerName $($ContainerName) points to a non-existing container on storage account $($StorageAccountName)"
+                    break;
+                }
+
+                Write-Host "Gathering files in container $($ContainerName)..."
                 $Blobs = Get-BlobsUsingContext -ContainerName $ContainerName -Context $Context
 
                 if (-not (Test-Path $DestinationFolder)) {
-                    Write-Host "`nCreating folder $($DestinationFolder)..."
+                    Write-Host "Creating folder $($DestinationFolder)..."
                     New-Item -Path $DestinationFolder -ItemType Directory -Force | Out-Null
                 }
-                $Blobs | Get-AzStorageBlobContent -Destination $DestinationFolder -Context $Context -Force | Out-Null
-                Write-Host "`nDownload complete!"
+
+                # Download files from container to local folder
+                Write-Host "[group]Downloding files to (local) folder..."
+                $Blobs | Get-AzStorageBlobContent -Destination $DestinationFolder -Context $Context -Force
+                Write-Host "[endgroup]"
+                Write-Host "Download complete!"
             }
             catch {
                 Write-Error "Failed to get blobs!"
@@ -358,7 +379,7 @@ else {
 #region UPLOAD : Get files from local folder and upload to storage container
 #
 if ($Upload -eq $false) {
-    Write-Host "`n`$Upload set to `$false, skipping step..."
+    Write-Host "`$Upload set to `$false, skipping step..."
 }
 else {
     if (($Upload -eq $true) -and ($Download -ne $true)) {
@@ -366,28 +387,40 @@ else {
         # Script implements SupportsShouldProcess and can therefore be run with -WhatIf and -Confirm parameters
         if ($PSCmdlet.ShouldProcess($($StorageAccountName), 'Uploading custom branding')) {
             try {
-                Write-Host "`n`$Upload is `$true - starting upload procedure."
+                Write-Host "`$Upload is `$true - starting upload procedure."
                 # Get authentication context, required for accessing storage account container
-                Write-Host "`nGetting context..."
+                Write-Host "Getting context..."
                 $Context = Get-StorageAccountContext -ResourceGroup $ResourceGroup -StorageAccountName $StorageAccountName
 
+                # Check for existance of local folder $SourceFolder
+                if (-not (Test-Path $SourceFolder)) {
+                    Write-Warning "Variable `$SourceFolder $($SourceFolder) points to a non-existing folder"
+                    break;
+                }
+
+                # Check for existance of branding container $ContainerName
+                if (-not (Get-AzStorageContainer -Name $ContainerName -Context $Context -ErrorAction SilentlyContinue)) {
+                    Write-Warning "Variable `$ContainerName $($ContainerName) points to a non-existing container on storage account $($StorageAccountName)"
+                    break;
+                }
+
                 # Upload files to storage account and container
-                Write-Host "`nGathering files in $($SourceFolder)..."
-                Write-Host "`n[group]Uploading files to container..."
+                Write-Host "Gathering files in $($SourceFolder)..."
+                Write-Host "[group]Uploading files to container..."
                 Get-ChildItem -Path $SourceFolder -File -Recurse | Set-AzStorageBlobContent -Container $ContainerName -Context $Context -Force
                 Write-Host "[endgroup]"
                 $Blobs = Get-BlobsUsingContext -ContainerName $ContainerName -Context $Context
-                Write-Host "`n[group]Setting content type based on file extension..."
+                Write-Host "[group]Setting content type based on file extension..."
                 Set-ContentType -Blobs $Blobs -ContainerName $ContainerName -Context $Context
                 Write-Host "[endgroup]"
-                Write-Host "`n[group]Setting cache control..."
+                Write-Host "[group]Setting cache control..."
                 foreach ($b in $Blobs) {
                     if ($b.Name -match "JS/unified.js") {
                         Set-CacheControl -Blob $b -MaxAge 30
                     }
                 }
                 Write-Host "[endgroup]"
-                Write-Host "`nUpload complete!"
+                Write-Host "Upload complete!"
             }
             catch {
                 Write-Error "Failed when getting or setting (uploading / overwriting) blobs!"
@@ -408,42 +441,42 @@ else {
 #region DELETE
 #
 if ($Upload -eq $false -and $Download -eq $false -and $Delete -eq $true) {
-    Write-Host "`n`$Upload set to `$false, download set to `$false, delete set to `$true. Executing step..."
+    Write-Host "`$Upload set to `$false, download set to `$false, delete set to `$true. Executing step..."
 
     # Script implements SupportsShouldProcess and can therefore be run with -WhatIf and -Confirm parameters
     if ($PSCmdlet.ShouldProcess($($ContainerName), 'Delete content in container')) {
         try {
-            Write-Host "`n`$Delete is `$true - starting cleanup process."
+            Write-Host "`$Delete is `$true - starting cleanup process."
             # Get authentication context, required for accessing storage account container
-            Write-Host "`nGetting context..."
+            Write-Host "Getting context..."
             $Context = Get-StorageAccountContext -ResourceGroup $ResourceGroup -StorageAccountName $StorageAccountName
             # Get files from storage account and container
-            Write-Host "`nGathering files in container $($ContainerName)..."
+            Write-Host "Gathering files in container $($ContainerName)..."
             $Blobs = Get-BlobsUsingContext -ContainerName $ContainerName -Context $Context
             if ($DeleteExtensions) {
-                Write-Host "`n[group]Deleting file(s) (and folder(s)) matching provided extension(s)..."
+                Write-Host "[group]Deleting file(s) (and folder(s)) matching provided extension(s)..."
                 foreach ($ext in $DeleteExtensions) {
-                    ($Blobs | Where-Object { $_.name -like "*.$ext" }) | Remove-AzStorageBlob
+                    ($Blobs | Where-Object { $_.name -like "*.$ext" }) | Remove-AzStorageBlob -Verbose -ErrorAction Continue
                 }
             }
             elseif ($DeleteFolders) {
-                Write-Host "`n[group]Deleting matching folder(s) and all content..."
+                Write-Host "[group]Deleting matching folder(s) and all content..."
                 foreach ($folder in $DeleteFolders) {
-                    ($Blobs | Where-Object { $_.name -like "*$folder/*" }) | Remove-AzStorageBlob
+                    ($Blobs | Where-Object { $_.name -like "*$folder/*" }) | Remove-AzStorageBlob -Verbose -ErrorAction Continue
                 }
             }
             elseif ($DeleteFiles) {
-                Write-Host "`n[group]Deleting file(s) matching name(s)..."
+                Write-Host "[group]Deleting file(s) matching name(s)..."
                 foreach ($file in $DeleteFiles) {
-                    ($Blobs | Where-Object { $_.name -match $file }) | Remove-AzStorageBlob
+                    ($Blobs | Where-Object { $_.name -match $file }) | Remove-AzStorageBlob -Verbose -ErrorAction Continue
                 }
             }
             else {
-                Write-Host "`n[group]Deleting files..."
-                $Blobs | Remove-AzStorageBlob
+                Write-Host "[group]Deleting files..."
+                $Blobs | Remove-AzStorageBlob -Verbose -ErrorAction Continue
             }
             Write-Host "[endgroup]"
-            Write-Host "`nCleanup complete!"
+            Write-Host "Cleanup complete!"
         }
         catch {
             Write-Error "Failed while deleting blobs!"
