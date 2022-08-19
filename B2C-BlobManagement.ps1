@@ -13,6 +13,8 @@
 .NOTES
     Written by Tim Peter Edstrøm, @timpeteren
 
+    18.08.22:
+    - Replace Write-Warning with Write-Host "##vso[task.logissue type=warning]" for improved logging when running in ADO pipeline.
     31.07.22:
     - Remove $EnvPrefix as required parameter for running script in a pipeline (only for local user context excecution of script).
     30.07.22:
@@ -204,7 +206,7 @@ if ($ClientId -and $ClientSecret) {
         Connect-AzAccount -AccountId $ClientId -Subscription $Subscription -AccessToken $($token.access_token) -ErrorAction Stop | Out-Null
     }
     catch {
-        Write-Warning "Could not authenticate with service principal. Aborting..."
+        Write-Host "##vso[task.logissue type=warning]Could not authenticate with service principal. Aborting..."
         break;
     }
 }
@@ -342,7 +344,7 @@ else {
 
                 # Check for existance of branding container $ContainerName
                 if (-not (Get-AzStorageContainer -Name $ContainerName -Context $Context -ErrorAction SilentlyContinue)) {
-                    Write-Warning "Variable `$ContainerName $($ContainerName) points to a non-existing container on storage account $($StorageAccountName)"
+                    Write-Host "##vso[task.logissue type=warning]Variable `$ContainerName $($ContainerName) points to a non-existing container on storage account $($StorageAccountName)"
                     break;
                 }
 
@@ -370,7 +372,7 @@ else {
         }
     }
     else {
-        Write-Warning "Did not take any action as both Download and Upload variables were set to `$true"
+        Write-Host "##vso[task.logissue type=warning]Did not take any action as both Download and Upload variables were set to `$true"
     }
 }
 #
@@ -394,13 +396,13 @@ else {
 
                 # Check for existance of local folder $SourceFolder
                 if (-not (Test-Path $SourceFolder)) {
-                    Write-Warning "Variable `$SourceFolder $($SourceFolder) points to a non-existing folder"
+                    Write-Host "##vso[task.logissue type=warning]Variable `$SourceFolder $($SourceFolder) points to a non-existing folder"
                     break;
                 }
 
                 # Check for existance of branding container $ContainerName
                 if (-not (Get-AzStorageContainer -Name $ContainerName -Context $Context -ErrorAction SilentlyContinue)) {
-                    Write-Warning "Variable `$ContainerName $($ContainerName) points to a non-existing container on storage account $($StorageAccountName)"
+                    Write-Host "##vso[task.logissue type=warning]Variable `$ContainerName $($ContainerName) points to a non-existing container on storage account $($StorageAccountName)"
                     break;
                 }
 
@@ -432,7 +434,7 @@ else {
         }
     }
     else {
-        Write-Warning "Did not take any action as both Upload and Download variables were set to `$true"
+        Write-Host "##vso[task.logissue type=warning]Did not take any action as both Upload and Download variables were set to `$true"
     }
 }
 #
