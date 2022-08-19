@@ -4,25 +4,22 @@
 [CmdletBinding()]
 param (
     # Account name to connect to Azure AD B2C tenant with
-    [Parameter(Mandatory=$true)]
-    [String]
-    $Username,
+    [Parameter(Mandatory = $true)]
+    [String]$Username,
 
     # Tenant identifier of Azure AD B2C tenant
-    [Parameter(Mandatory=$true)]
-    [String]
-    $TenantIdentifier
+    [Parameter(Mandatory = $true)]
+    [String]$TenantIdentifier
 )
 
 Connect-AzureAD -AccountId $Username -TenantId $TenantIdentifier
 
 function Upload-B2CPolicies {
-param(
-    # Parameter used to pass in one or more policy files (not all)
-    [Parameter(Mandatory=$false)]
-    [Array]
-    $Policies
-)
+    param(
+        # Parameter used to pass in one or more policy files (not all)
+        [Parameter(Mandatory = $false)]
+        [Array]$Policies
+    )
     $policyFiles = New-Object -TypeName "System.Collections.ArrayList"
     if (-not [System.String]::IsNullOrEmpty($Policies) ) {
         foreach ($pol in $Policies) {
@@ -34,7 +31,7 @@ param(
     }
 
     foreach ($file in $policyFiles) {
-        [xml] $policyContent = Get-Content -Path $($file.FullName)
+        [xml]$policyContent = Get-Content -Path $($file.FullName)
         $Result = $null
         $Result = Set-AzureADMSTrustFrameworkPolicy -Id $($policyContent.TrustFrameworkPolicy.PolicyId) -InputFilePath $file.FullName
 
