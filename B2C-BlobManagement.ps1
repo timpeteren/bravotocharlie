@@ -292,7 +292,7 @@ function Set-ContentType {
             ".png" { $ContentType = "image/png" }
             ".WOFF" { $ContentType = "font/woff" }
             ".svg" { $ContentType = "image/svg+xml" }
-            ".js" { $ContentType = "application/javascript" }
+            ".js" { $ContentType = "text/javascript" }
             ".html" { $ContentType = "text/html; charset=utf 8" }
             ".css" { $ContentType = "text/css; charset=utf 8" }
             ".xml" { $ContentType = "text/xml; charset=utf 8" }
