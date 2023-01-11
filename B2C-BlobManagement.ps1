@@ -380,7 +380,7 @@ else {
                 }
 
                 # Download files from container to local folder
-                Write-Host "[group]Downloding files to (local) folder..."
+                Write-Host "[group]Downloading files to (local) folder..."
                 $Blobs | Get-AzStorageBlobContent -Destination $DestinationFolder -Context $Context -Force
                 Write-Host "[endgroup]"
                 Write-Host "Download complete!"
@@ -434,18 +434,20 @@ else {
                 Write-Host "[group]Uploading files to container..."
                 Get-ChildItem -Path $SourceFolder -File -Recurse | Set-AzStorageBlobContent -Container $ContainerName -Context $Context -Force
                 Write-Host "[endgroup]"
+
+                #region Process blobs
+                # Create list of blobs from container content
                 $Blobs = Get-BlobsUsingContext -ContainerName $ContainerName -Context $Context
-                Write-Host "[group]Setting content type based on file extension..."
-                Set-ContentType -Blobs $Blobs -ContainerName $ContainerName -Context $Context
-                Write-Host "[endgroup]"
-                Write-Host "[group]Setting cache control..."
+
+                Write-Host "Setting blob properties..."
+                # Run through list of blobs and update content type, cache control properties
                 foreach ($b in $Blobs) {
                     if ($b.Name -match "JS/unified.js") {
                         Set-CacheControl -Blob $b -MaxAge 30
                     }
                 }
-                Write-Host "[endgroup]"
-                Write-Host "Upload complete!"
+                Write-Host "[endgroup]Uploading blobs complete, properties applied!"
+                #endregion
             }
             catch {
                 Write-Error "Failed when getting or setting (uploading / overwriting) blobs!"
