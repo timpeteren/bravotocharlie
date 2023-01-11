@@ -299,42 +299,28 @@ function Get-BlobsUsingContext {
 
 function Set-ContentType {
     param (
-        # List of blobs to set content type
+        # Blob to set cache control
         [Parameter(Mandatory = $true)]
-        $Blobs,
-        # Blob container
-        [Parameter(Mandatory = $true)]
-        $ContainerName,
-        # Context, required for accessing container
-        [Parameter(Mandatory = $true)]
-        $Context
+        $Blob
     )
     
-    # Run through container blobs and set content type according to extension
-    $Blobs = Get-AzStorageBlob -Container $ContainerName -Context $Context -Verbose
-    foreach ($Blob in $Blobs) {
-        Write-Host "Processing Blob: $($Blob.Name)"    
-        $Extension = [IO.Path]::GetExtension($Blob.Name)
-        $ContentType = ""
-        Switch ($Extension) {
-            ".png" { $ContentType = "image/png" }
-            ".WOFF" { $ContentType = "font/woff" }
-            ".svg" { $ContentType = "image/svg+xml" }
-            ".js" { $ContentType = "text/javascript" }
-            ".html" { $ContentType = "text/html; charset=utf 8" }
-            ".css" { $ContentType = "text/css; charset=utf 8" }
-            ".xml" { $ContentType = "text/xml; charset=utf 8" }
-            Default { $ContentType = "" }
-        }
+    # Set content type according to extension
+    $contentType = ""
+    $extension = [IO.Path]::GetExtension($Blob.Name)
+    Switch ($extension) {
+        ".png" { $contentType = "image/png" }
+        ".WOFF" { $contentType = "font/woff" }
+        ".svg" { $contentType = "image/svg+xml" }
+        ".js" { $contentType = "text/javascript" }
+        ".html" { $contentType = "text/html; charset=utf 8" }
+        ".css" { $contentType = "text/css; charset=utf 8" }
+        ".xml" { $contentType = "text/xml; charset=utf 8" }
+        Default { $contentType = "" }
+    }
         
-        if ($Blob.ContentType.ToString() -ne $ContentType) {
-            Write-Host "Blob file extension is $Extension - content type will be set to $ContentType."
-            $($Blob.ICloudBlob).Properties.ContentType = $ContentType
-    
-            $task = $($Blob.ICloudBlob).SetPropertiesAsync()
-            $task.Wait()
-            Write-Host "Task status: $($task.Status)."
-        }
+    if ($Blob.contentType.ToString() -ne $contentType) {
+        Write-Host "Blob extension is $extension - content type will be set to $contentType."
+        $($Blob.ICloudBlob).Properties.contentType = $contentType
     }
 }
 
