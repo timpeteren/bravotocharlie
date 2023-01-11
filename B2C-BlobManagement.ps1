@@ -187,11 +187,12 @@ if (-not ($ClientId -and $ClientSecret)) {
 function Test-RequiredModules {
     param (
         [Parameter(Mandatory = $true)]
-        $Modules
+        $Modules,
+        [Parameter(Mandatory = $false)]
+        $WhatIf = $false
     )
     # Implemented to avoid SupportsShouldProcess to WhatIf pre-requisites check and crashing the script
-    $WhatIfPrefPop = $WhatIfPreference
-    $WhatIfPreference = $false
+    $WhatIfPreference = $WhatIf
         
     # Pre-requisite modules check and installation of missing packages
     if ($Modules) {
@@ -208,17 +209,16 @@ function Test-RequiredModules {
         foreach ($item in $Modules) {
             if ($item -notin $mods) {
                 Write-Host "Installing $item..."
-                Install-Module -Name $item -Scope CurrentUser -Force | Out-Null
+                Install-Module -Name $item -Scope CurrentUser -Force -WhatIf:$WhatIfPreference | Out-Null
             }
         }
         Write-Host "[endgroup]"
     }
-    $WhatIfPreference = $WhatIfPrefPop
 }
 
 # Test for existance of required modules and install if missing
 if ($NoTestPreReqs -ne $true -and $NoTestPreReqsOverride -ne $true) {
-    Test-RequiredModules -Modules "Az.Accounts", "Az.Storage"
+    Test-RequiredModules -Modules "Az.Accounts", "Az.Storage" -WhatIf:$false
 }
 
 # If app principal id and secret is provided, use access_token to connect to ARM
