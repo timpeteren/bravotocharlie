@@ -336,6 +336,15 @@ function Set-CacheControl {
 
     Write-Host "Cache control setting for $($Blob.Name) will be set to $($MaxAge) seconds."
     $($Blob.ICloudBlob).Properties.CacheControl = "max-age-$($MaxAge)"
+}
+
+function Set-BlobProperties {
+    param (
+        # Blob to be updated
+        [Parameter(Mandatory = $true)]
+        $Blob
+    )
+
     $task = $($Blob.ICloudBlob).SetPropertiesAsync()
     $task.Wait()
     Write-Host "Task status: $($task.Status)."
