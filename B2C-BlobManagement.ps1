@@ -13,6 +13,21 @@
 .NOTES
     Written by Tim Peter Edstrøm, @timpeteren
 
+    11.01.23:
+    - Add context of PIPELINE or USER execution to EXAMPLEs
+    - Verify that script functionality remains intact.
+        ContentType and CacheControl remains to be sorted under ICloudBlob.Properties.
+    
+        "WARNING: Upcoming breaking changes in the cmdlet 'Get-AzStorageBlob' :
+        The returned blob properties will be moved from ICloudBlob.Properties to BlobProperties in a future release.
+
+        Note : Go to https://aka.ms/azps-changewarnings for steps to suppress this breaking change warning, and other information on
+        breaking changes in Azure PowerShell."
+    19.10.22:
+    - Add Set-BlobProperties
+    - Restructure upload section to avoid potentionally calling SetPropertiesAsync() twice
+    12.09.22:
+    - Add logic to pipeline to support multi-environment deployment (check for existance of $ENV:ISBRANDING) (assumes "Development" as branding $environmentFolder)
     18.08.22:
     - Replace Write-Warning with Write-Host "##vso[task.logissue type=warning]" for improved logging when running in ADO pipeline.
     31.07.22:
@@ -32,15 +47,26 @@
     - Script must be run in context of an authenticated user.
     - Script implements SupportsShouldProcess and can be used with -WhatIf and -Confirm.
 .EXAMPLE
-    .\B2C-BlobManagement.ps1 -TenantId tid -Subscription sub -ClientId id -ClientSecret secret -Subscription sub -ResourcGroup rg -StorageAccountName sa -ContainerName container -SourceFolder pathToFolder
+    PIPELINE execution:
+
+    .\B2C-BlobManagement.ps1 -TenantId tid -Subscription sub -ClientId id -ClientSecret secret -Subscription sub -ResourceGroup rg -StorageAccountName sa -ContainerName container -SourceFolder pathToFolder
 
     Executed from a release pipeline, all variables will have to be assigned on the command line and principal must have requisite permissions to resources.
     Files in source directory will be uploaded, -Upload $true -Download $false doesn't have to be provided as upload is the default script behaviour.
 .EXAMPLE
-    .\B2C-BlobManagement.ps1 -Upload $true -Download $false -Subscription sub -ResourcGroup rg -StorageAccountName sa
+    PIPELINE execution:
+
+    .\B2C-BlobManagement.ps1 -Upload $true -Download $false -Subscription sub -ResourceGroup rg -StorageAccountName sa
 
     TenantId, ClientId and ClientSecret can be read from $ENV: (environment) variables by matching param() default values.
 .EXAMPLE
+    USER exection:
+
+    .\B2C-BlobManagement.ps1 -EnvPrefix d/t/p -Download:$true -Upload:$false -DestinationFolder C:\GIT\Destination (-WhatIf)
+
+.EXAMPLE
+    USER execution:
+
     .\B2C-BlobManagement.ps1 -EnvPrefix d/t/p -Download:$true -Upload:$false -DestinationFolder C:\GIT\Destination (-WhatIf)
 
     If all required parameters have been set in 'Manually configured variables' the script can be executed with only -EnvPrefix parameter (add -WhatIf to see what will happen).
@@ -48,6 +74,8 @@
     If provided as an input param -DestinationFolder will superseed settings in 'Manually configured variables'.
     The script will prompt for user credentials.
 .EXAMPLE
+    USER execution:
+
     .\B2C-BlobManagement.ps1 -EnvPrefix d/t/p -Username myUser@myDomain.com -Upload:$true -Download:$false -SourceFolder C:\GIT\Source (-WhatIf)
 
     As If all required parameters have been set in the script file it can be executed with only -EnvPrefix, add -Username to avoid account picker.
@@ -159,11 +187,12 @@ if (-not ($ClientId -and $ClientSecret)) {
 function Test-RequiredModules {
     param (
         [Parameter(Mandatory = $true)]
-        $Modules
+        $Modules,
+        [Parameter(Mandatory = $false)]
+        $WhatIf = $false
     )
     # Implemented to avoid SupportsShouldProcess to WhatIf pre-requisites check and crashing the script
-    $WhatIfPrefPop = $WhatIfPreference
-    $WhatIfPreference = $false
+    $WhatIfPreference = $WhatIf
         
     # Pre-requisite modules check and installation of missing packages
     if ($Modules) {
@@ -180,17 +209,16 @@ function Test-RequiredModules {
         foreach ($item in $Modules) {
             if ($item -notin $mods) {
                 Write-Host "Installing $item..."
-                Install-Module -Name $item -Scope CurrentUser -Force | Out-Null
+                Install-Module -Name $item -Scope CurrentUser -Force -WhatIf:$WhatIfPreference | Out-Null
             }
         }
         Write-Host "[endgroup]"
     }
-    $WhatIfPreference = $WhatIfPrefPop
 }
 
 # Test for existance of required modules and install if missing
 if ($NoTestPreReqs -ne $true -and $NoTestPreReqsOverride -ne $true) {
-    Test-RequiredModules -Modules "Az.Accounts", "Az.Storage"
+    Test-RequiredModules -Modules "Az.Accounts", "Az.Storage" -WhatIf:$false
 }
 
 # If app principal id and secret is provided, use access_token to connect to ARM
@@ -271,42 +299,28 @@ function Get-BlobsUsingContext {
 
 function Set-ContentType {
     param (
-        # List of blobs to set content type
+        # Blob to set cache control
         [Parameter(Mandatory = $true)]
-        $Blobs,
-        # Blob container
-        [Parameter(Mandatory = $true)]
-        $ContainerName,
-        # Context, required for accessing container
-        [Parameter(Mandatory = $true)]
-        $Context
+        $Blob
     )
     
-    # Run through container blobs and set content type according to extension
-    $Blobs = Get-AzStorageBlob -Container $ContainerName -Context $Context -Verbose
-    foreach ($Blob in $Blobs) {
-        Write-Host "Processing Blob: $($Blob.Name)"    
-        $Extension = [IO.Path]::GetExtension($Blob.Name)
-        $ContentType = ""
-        Switch ($Extension) {
-            ".png" { $ContentType = "image/png" }
-            ".WOFF" { $ContentType = "font/woff" }
-            ".svg" { $ContentType = "image/svg+xml" }
-            ".js" { $ContentType = "text/javascript" }
-            ".html" { $ContentType = "text/html; charset=utf 8" }
-            ".css" { $ContentType = "text/css; charset=utf 8" }
-            ".xml" { $ContentType = "text/xml; charset=utf 8" }
-            Default { $ContentType = "" }
-        }
+    # Set content type according to extension
+    $contentType = ""
+    $extension = [IO.Path]::GetExtension($Blob.Name)
+    Switch ($extension) {
+        ".png" { $contentType = "image/png" }
+        ".WOFF" { $contentType = "font/woff" }
+        ".svg" { $contentType = "image/svg+xml" }
+        ".js" { $contentType = "text/javascript" }
+        ".html" { $contentType = "text/html; charset=utf 8" }
+        ".css" { $contentType = "text/css; charset=utf 8" }
+        ".xml" { $contentType = "text/xml; charset=utf 8" }
+        Default { $contentType = "" }
+    }
         
-        if ($Blob.ContentType.ToString() -ne $ContentType) {
-            Write-Host "Blob file extension is $Extension - content type will be set to $ContentType."
-            $($Blob.ICloudBlob).Properties.ContentType = $ContentType
-    
-            $task = $($Blob.ICloudBlob).SetPropertiesAsync()
-            $task.Wait()
-            Write-Host "Task status: $($task.Status)."
-        }
+    if ($Blob.contentType.ToString() -ne $contentType) {
+        Write-Host "Blob extension is $extension - content type will be set to $contentType."
+        $($Blob.ICloudBlob).Properties.contentType = $contentType
     }
 }
 
@@ -322,6 +336,15 @@ function Set-CacheControl {
 
     Write-Host "Cache control setting for $($Blob.Name) will be set to $($MaxAge) seconds."
     $($Blob.ICloudBlob).Properties.CacheControl = "max-age-$($MaxAge)"
+}
+
+function Set-BlobProperties {
+    param (
+        # Blob to be updated
+        [Parameter(Mandatory = $true)]
+        $Blob
+    )
+
     $task = $($Blob.ICloudBlob).SetPropertiesAsync()
     $task.Wait()
     Write-Host "Task status: $($task.Status)."
@@ -357,7 +380,7 @@ else {
                 }
 
                 # Download files from container to local folder
-                Write-Host "[group]Downloding files to (local) folder..."
+                Write-Host "[group]Downloading files to (local) folder..."
                 $Blobs | Get-AzStorageBlobContent -Destination $DestinationFolder -Context $Context -Force
                 Write-Host "[endgroup]"
                 Write-Host "Download complete!"
@@ -386,6 +409,25 @@ if ($Upload -eq $false) {
 else {
     if (($Upload -eq $true) -and ($Download -ne $true)) {
         
+        #region For pipeline execution of multiple environments
+        # Outside of ShouldSupportsProcess to output correct path when -WhatIf:`$true
+        if ($ENV:ISBRANDING -eq $true) {
+            # Set $environmentFolder to "Development"
+            $environmentFolder = "Development"
+            # See if environment_folder matches "Dev"
+            if (-not ($ENV:ENVIRONMENT_FOLDER -match "Dev")) {
+                # Check if environment_folder exists
+                if (Test-Path "$PSScriptRoot/../Environments/$($ENV:ENVIRONMENT_FOLDER)") {
+                    Write-Host "##vso[task.logissue type=warning]Setting path to $environmentFolder..." -ErrorAction Continue
+                    $environmentFolder = $ENV:ENVIRONMENT_FOLDER
+                }
+            }
+            # Set $environmentPath for verifying path of custom branding content and policy files
+            $environmentPath = Join-Path "$PSScriptRoot/../Environments" $environmentFolder
+            $SourceFolder = Join-Path $environmentPath $ContainerName
+        }
+        #endregion
+
         # Script implements SupportsShouldProcess and can therefore be run with -WhatIf and -Confirm parameters
         if ($PSCmdlet.ShouldProcess($($StorageAccountName), 'Uploading custom branding')) {
             try {
@@ -411,18 +453,35 @@ else {
                 Write-Host "[group]Uploading files to container..."
                 Get-ChildItem -Path $SourceFolder -File -Recurse | Set-AzStorageBlobContent -Container $ContainerName -Context $Context -Force
                 Write-Host "[endgroup]"
+
+                #region Process blobs
+                # Create list of blobs from container content
                 $Blobs = Get-BlobsUsingContext -ContainerName $ContainerName -Context $Context
-                Write-Host "[group]Setting content type based on file extension..."
-                Set-ContentType -Blobs $Blobs -ContainerName $ContainerName -Context $Context
-                Write-Host "[endgroup]"
-                Write-Host "[group]Setting cache control..."
+
+                Write-Host "Setting blob properties..."
+                # Run through list of blobs and update content type, cache control properties
                 foreach ($b in $Blobs) {
+                    Write-Host "[group]Processing blob: $($b.Name)"
+                    
+                    Write-Host "Setting content type based on .extension..."
+                    # Set blob content type based on .extension
+                    Set-ContentType -Blob $b
+                    
+                    Write-Host "Setting cache control..."
+                    # Check if any of the blobs match the regular expression
                     if ($b.Name -match "JS/unified.js") {
-                        Set-CacheControl -Blob $b -MaxAge 30
+                        # Set blob cache property in seconds
+                        $cacheAgeInSeconds = 30
+                        Set-CacheControl -Blob $b -MaxAge $cacheAgeInSeconds
                     }
+
+                    Write-Host "Updating blob..."
+                    Set-BlobProperties -Blob $b
+
+                    Write-Host "[endgroup]"
                 }
-                Write-Host "[endgroup]"
-                Write-Host "Upload complete!"
+                Write-Host "[endgroup]Uploading blobs complete, properties applied!"
+                #endregion
             }
             catch {
                 Write-Error "Failed when getting or setting (uploading / overwriting) blobs!"
