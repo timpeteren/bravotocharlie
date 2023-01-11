@@ -461,9 +461,24 @@ else {
                 Write-Host "Setting blob properties..."
                 # Run through list of blobs and update content type, cache control properties
                 foreach ($b in $Blobs) {
+                    Write-Host "[group]Processing blob: $($b.Name)"
+                    
+                    Write-Host "Setting content type based on .extension..."
+                    # Set blob content type based on .extension
+                    Set-ContentType -Blob $b
+                    
+                    Write-Host "Setting cache control..."
+                    # Check if any of the blobs match the regular expression
                     if ($b.Name -match "JS/unified.js") {
-                        Set-CacheControl -Blob $b -MaxAge 30
+                        # Set blob cache property in seconds
+                        $cacheAgeInSeconds = 30
+                        Set-CacheControl -Blob $b -MaxAge $cacheAgeInSeconds
                     }
+
+                    Write-Host "Updating blob..."
+                    Set-BlobProperties -Blob $b
+
+                    Write-Host "[endgroup]"
                 }
                 Write-Host "[endgroup]Uploading blobs complete, properties applied!"
                 #endregion
