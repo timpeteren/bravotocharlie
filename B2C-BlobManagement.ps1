@@ -13,6 +13,21 @@
 .NOTES
     Written by Tim Peter Edstrøm, @timpeteren
 
+    11.01.23:
+    - Add context of PIPELINE or USER execution to EXAMPLEs
+    - Verify that script functionality remains intact.
+        ContentType and CacheControl remains to be sorted under ICloudBlob.Properties.
+    
+        "WARNING: Upcoming breaking changes in the cmdlet 'Get-AzStorageBlob' :
+        The returned blob properties will be moved from ICloudBlob.Properties to BlobProperties in a future release.
+
+        Note : Go to https://aka.ms/azps-changewarnings for steps to suppress this breaking change warning, and other information on
+        breaking changes in Azure PowerShell."
+    19.10.22:
+    - Add Set-BlobProperties
+    - Restructure upload section to avoid potentionally calling SetPropertiesAsync() twice
+    12.09.22:
+    - Add logic to pipeline to support multi-environment deployment (check for existance of $ENV:ISBRANDING) (assumes "Development" as branding $environmentFolder)
     18.08.22:
     - Replace Write-Warning with Write-Host "##vso[task.logissue type=warning]" for improved logging when running in ADO pipeline.
     31.07.22:
@@ -32,15 +47,26 @@
     - Script must be run in context of an authenticated user.
     - Script implements SupportsShouldProcess and can be used with -WhatIf and -Confirm.
 .EXAMPLE
-    .\B2C-BlobManagement.ps1 -TenantId tid -Subscription sub -ClientId id -ClientSecret secret -Subscription sub -ResourcGroup rg -StorageAccountName sa -ContainerName container -SourceFolder pathToFolder
+    PIPELINE execution:
+
+    .\B2C-BlobManagement.ps1 -TenantId tid -Subscription sub -ClientId id -ClientSecret secret -Subscription sub -ResourceGroup rg -StorageAccountName sa -ContainerName container -SourceFolder pathToFolder
 
     Executed from a release pipeline, all variables will have to be assigned on the command line and principal must have requisite permissions to resources.
     Files in source directory will be uploaded, -Upload $true -Download $false doesn't have to be provided as upload is the default script behaviour.
 .EXAMPLE
-    .\B2C-BlobManagement.ps1 -Upload $true -Download $false -Subscription sub -ResourcGroup rg -StorageAccountName sa
+    PIPELINE execution:
+
+    .\B2C-BlobManagement.ps1 -Upload $true -Download $false -Subscription sub -ResourceGroup rg -StorageAccountName sa
 
     TenantId, ClientId and ClientSecret can be read from $ENV: (environment) variables by matching param() default values.
 .EXAMPLE
+    USER exection:
+
+    .\B2C-BlobManagement.ps1 -EnvPrefix d/t/p -Download:$true -Upload:$false -DestinationFolder C:\GIT\Destination (-WhatIf)
+
+.EXAMPLE
+    USER execution:
+
     .\B2C-BlobManagement.ps1 -EnvPrefix d/t/p -Download:$true -Upload:$false -DestinationFolder C:\GIT\Destination (-WhatIf)
 
     If all required parameters have been set in 'Manually configured variables' the script can be executed with only -EnvPrefix parameter (add -WhatIf to see what will happen).
@@ -48,6 +74,8 @@
     If provided as an input param -DestinationFolder will superseed settings in 'Manually configured variables'.
     The script will prompt for user credentials.
 .EXAMPLE
+    USER execution:
+
     .\B2C-BlobManagement.ps1 -EnvPrefix d/t/p -Username myUser@myDomain.com -Upload:$true -Download:$false -SourceFolder C:\GIT\Source (-WhatIf)
 
     As If all required parameters have been set in the script file it can be executed with only -EnvPrefix, add -Username to avoid account picker.
