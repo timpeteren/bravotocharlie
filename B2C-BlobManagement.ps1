@@ -409,6 +409,25 @@ if ($Upload -eq $false) {
 else {
     if (($Upload -eq $true) -and ($Download -ne $true)) {
         
+        #region For pipeline execution of multiple environments
+        # Outside of ShouldSupportsProcess to output correct path when -WhatIf:`$true
+        if ($ENV:ISBRANDING -eq $true) {
+            # Set $environmentFolder to "Development"
+            $environmentFolder = "Development"
+            # See if environment_folder matches "Dev"
+            if (-not ($ENV:ENVIRONMENT_FOLDER -match "Dev")) {
+                # Check if environment_folder exists
+                if (Test-Path "$PSScriptRoot/../Environments/$($ENV:ENVIRONMENT_FOLDER)") {
+                    Write-Host "##vso[task.logissue type=warning]Setting path to $environmentFolder..." -ErrorAction Continue
+                    $environmentFolder = $ENV:ENVIRONMENT_FOLDER
+                }
+            }
+            # Set $environmentPath for verifying path of custom branding content and policy files
+            $environmentPath = Join-Path "$PSScriptRoot/../Environments" $environmentFolder
+            $SourceFolder = Join-Path $environmentPath $ContainerName
+        }
+        #endregion
+
         # Script implements SupportsShouldProcess and can therefore be run with -WhatIf and -Confirm parameters
         if ($PSCmdlet.ShouldProcess($($StorageAccountName), 'Uploading custom branding')) {
             try {
