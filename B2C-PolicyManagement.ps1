@@ -1,31 +1,36 @@
 <#
 .SYNOPSIS
-    Uploads policy files (from folder where script runs), to Azure AD B2C, after replacing PLACHOLDER_ values.
+    Uploads policy files to Azure AD B2C, after replacing PLACHOLDER_ values.
+    Policy files can be addressed with full path, else script looks for files in the current directory.
 .DESCRIPTION
     Script has a $Placeholders hash table holding all required values.
     To verify that all settings are present a pre-check is run.
-    The pre-check compares $Placeholders with $ValidPlaceholders from function Invoke-PlaceholderReplace.
-    Only then does the script replace the PLACEHOLDER_ values and subsequently uploads the policy files.
+    The pre-check compares $Placeholders with $ValidPlaceholders in function Invoke-PlaceholderReplace.
+    If pre-check is successful, the script replaces the PLACEHOLDER_ values and uploads the policy files.
 .NOTES
     Connect-AzureAD must be run prior to script execution as a valid session is required.
-    Assumes that account / session has AAD B2C tenant privilege 'Policy.ReadWrite.TrustFramework'.
+    Assumes that account has AAD B2C tenant privilege 'Policy.ReadWrite.TrustFramework'.
 
     Written by Tim Peter Edstrøm, @timpeteren
 
-    v1.1 09.08.22:
+    v1.3 - 16.01.23:
+    - Esthetics, comments, example
+    v1.2 - 10.10.22:
+    - Add HELPERAPI placeholder
+    v1.1 - 09.08.22:
     - Fix folder cleanup
     - Set default -DeployFolder value statically to ".\Deploy"
     - Fix .EXAMPLE for using -PolicyFiles with multiple policy files (must be comma separated)
-    v1.0 09.08.22:
+    v1.0 - 09.08.22:
     - Test and bugfix
     - Add comment section
-    v0.5 08.08.22:
+    v0.5 - 08.08.22:
     - Add PLACHOLDER verification and replacement and policy upload
 .EXAMPLE
     B2C-PolicyManagement
     Looks for policy files in current folder, creates a temporary .\Deploy folder while processing.
 .EXAMPLE
-    B2C-PolicyManagement -PolicyFiles .\3-b2c_1a_v2_signupsignin.xml, .\4-b2c_1a_v2_passwordreset.xml -DeployFolder MinDeploy
+    B2C-PolicyManagement -PolicyFiles .\3-b2c_1a_v2_signupsignin.xml, .\4-b2c_1a_v2_passwordreset.xml -DeployFolder MyDeploy
     Specify a single, or multiple, policy file(s) to be processed.
     Use -DeployFolder to override default (.\Deploy).
 .EXAMPLE
@@ -43,7 +48,7 @@ param (
     [Parameter(Mandatory = $false)]
     [bool]$DoNoDeletePolicyFiles = $false
 )
-    
+
 $Placeholders = @{
     "PLACEHOLDER_TENANTNAME"                  = ""
     "PLACEHOLDER_TENANTID"                    = ""
@@ -55,6 +60,7 @@ $Placeholders = @{
     "PLACEHOLDER_B2C_EXTENSIONS_APP_OBJECTID" = ""
     "PLACEHOLDER_AAD_COMMON_APP_CLIENTID"     = ""
     "PLACEHOLDER_IDPORTEN_CLIENTID"           = ""
+    "PLACEHOLDER_HELPERAPI_URL"               = ""
 }
 
 function Invoke-PlaceholderReplace {
@@ -67,7 +73,7 @@ function Invoke-PlaceholderReplace {
         [Parameter(Mandatory = $false)]
         $DeployFolder
     )
-        
+
     $ValidPlaceholders = @(
         "PLACEHOLDER_TENANTNAME"
         "PLACEHOLDER_TENANTID"
@@ -79,6 +85,7 @@ function Invoke-PlaceholderReplace {
         "PLACEHOLDER_B2C_EXTENSIONS_APP_OBJECTID"
         "PLACEHOLDER_AAD_COMMON_APP_CLIENTID"
         "PLACEHOLDER_IDPORTEN_CLIENTID"
+        "PLACEHOLDER_HELPERAPI_URL"
     )
 
     $files = New-Object -TypeName "System.Collections.ArrayList"
@@ -95,14 +102,14 @@ function Invoke-PlaceholderReplace {
     $files | ForEach-Object {
         Write-Host "$($_.FullName)"
         $content = Get-Content $_.FullName -Raw
-        
+
         [Regex]::Matches($content, "PLACEHOLDER_[A-Z0-9_]+") | 
         Where-Object Value -notin $ValidPlaceholders |
         ForEach-Object {
             Write-Host "$($_.FullName) - not a valid placeholder $($_.Value)"
             break;
         }
-        
+
         $updated = $false
         $ValidPlaceholders | ForEach-Object {
             # If the variable exists, replace it
@@ -144,7 +151,7 @@ function Invoke-PolicyUpload {
         [xml]$policyContent = Get-Content -Path $($file.FullName)
         $result = $null
         $result = Set-AzureADMSTrustFrameworkPolicy -Id $($policyContent.TrustFrameworkPolicy.PolicyId) -InputFilePath $file.FullName
-        
+
         if ( [String]::IsNullOrWhiteSpace($result) ) {
             Write-Host "Upload of policy $($policyContent.TrustFrameworkPolicy.PolicyId) failed!"
             break;
