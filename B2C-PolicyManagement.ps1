@@ -13,6 +13,10 @@
 
     Written by Tim Peter Edstrøm, @timpeteren
 
+    v1.6 - 07.08.23:
+    - Removed variable TENANTID, added multiple APP, RESTAPI, SENDGRID configuration integrations
+    v1.5 - 23.06.23:
+    - Added values to Placeholder objects for dev / prod environments (supports updated generalized policy files)
     v1.3 - 16.01.23:
     - Esthetics, comments, example
     v1.2 - 10.10.22:
@@ -46,21 +50,87 @@ param (
     [Parameter(Mandatory = $false)]
     [Array]$PolicyFiles,
     [Parameter(Mandatory = $false)]
-    [bool]$DoNoDeletePolicyFiles = $false
+    [Bool]$DoNoDeletePolicyFiles = $false,
+    [Parameter(Mandatory = $false)]
+    [String]$Environment
 )
 
-$Placeholders = @{
-    "PLACEHOLDER_TENANTNAME"                  = ""
-    "PLACEHOLDER_TENANTID"                    = ""
-    "PLACEHOLDER_BRANDINGBASEURL"             = ""
-    "PLACEHOLDER_INSTRUMENTATIONKEY"          = ""
-    "PLACEHOLDER_IEF_CLIENTID"                = ""
-    "PLACEHOLDER_IEFPROXY_CLIENTID"           = ""
-    "PLACEHOLDER_B2C_EXTENSIONS_APP_CLIENTID" = ""
-    "PLACEHOLDER_B2C_EXTENSIONS_APP_OBJECTID" = ""
-    "PLACEHOLDER_AAD_COMMON_APP_CLIENTID"     = ""
-    "PLACEHOLDER_IDPORTEN_CLIENTID"           = ""
-    "PLACEHOLDER_HELPERAPI_URL"               = ""
+if (-not $Environment) {
+    $Environment = "Dev"
+    Write-Host "`$Environment not provided, using 'Dev' settings for placeholder values.`n" -ForegroundColor Green
+}
+elseif (($Environment) -and ($Environment -eq "Dev")) {
+    $Environment = "Dev"
+    Write-Host "`$Environment settings 'Dev' for placeholder values.`n" -ForegroundColor Green
+}
+elseif (($Environment) -and ($Environment -eq "Prod")) {
+    $Environment = "Prod"
+    Write-Host "`$Environment settings 'Prod' for placeholder values.`n" -ForegroundColor Green
+}
+else {
+    Write-Host "Incorrect `$Environment provided, either 'Dev' or 'Prod' for required placeholder values." -ForegroundColor Yellow
+    break;
+}
+
+if ($Environment -eq "Dev") {
+
+    $Placeholders = @{
+        "PLACEHOLDER_TENANTNAME"                            = "xxdevb2c.onmicrosoft.com"
+        "PLACEHOLDER_BRANDINGBASEURL"                       = ""
+        "BRANDING_CONTAINER_NAME"                           = "branding"
+        "PLACEHOLDER_INSTRUMENTATIONKEY"                    = ""
+        "PLACEHOLDER_DEPLOYMENTMODE"                        = "Development"
+        "PLACEHOLDER_DEVELOPERMODE"                         = "true"
+        "PLACEHOLDER_IEF_CLIENTID"                          = ""
+        "PLACEHOLDER_IEFPROXY_CLIENTID"                     = ""
+        "PLACEHOLDER_B2C_EXTENSIONS_APP_CLIENTID"           = ""
+        "PLACEHOLDER_B2C_EXTENSIONS_APP_OBJECTID"           = ""
+
+        "PLACEHOLDER_AAD_COMMON_APP_CLIENTID"               = ""
+        "PLACEHOLDER_AAD_COMMON_APP_SCOPE"                  = "openid profile email"
+        "PLACEHOLDER_AAD_USER_IMPERSONATION_APP_CLIENTID"   = ""
+        "PLACEHOLDER_AAD_USER_IMPERSONATION_APP_SCOPE"      = "openid profile email"
+        "PLACEHOLDER_RESTAPI_URL"                           = "xx.service.com"
+        "PLACEHOLDER_RESTAPI_SCOPE"                         = "xxdevb2c.onmicrosoft.com/<GUID>"
+        "PLACEHOLDER_GRAPHAPI_SCOPE"                        = "graph.onmicrosoft.com"
+        "PLACEHOLDER_SENDGRID_URL"                          = "api.sendgrid.com"
+        "PLACEHOLDER_SENDGRID_NB"                           = "noID123"
+        "PLACEHOLDER_SENDGRID_EN"                           = "enID456"
+        "PLACEHOLDER_SENDGRID_FROM"                         = "no-reply@myCompany.com"
+        "PLACEHOLDER_SENDGRID_TEMPLATE_NB_ID"               = "<uniqueID>"
+        "PLACEHOLDER_SENDGRID_TEMPLATE_EN_ID"               = "<uniqueID>"
+        "PLACEHOLDER_HELPERAPI_URL"                         = ""
+    }
+}
+if ($Environment -eq "Prod") {
+
+    $Placeholders = @{
+        "PLACEHOLDER_TENANTNAME"                            = "xxprodb2c.onmicrosoft.com"
+        "PLACEHOLDER_BRANDINGBASEURL"                       = ""
+        "BRANDING_CONTAINER_NAME"                           = "branding"
+        "PLACEHOLDER_INSTRUMENTATIONKEY"                    = ""
+        "PLACEHOLDER_DEPLOYMENTMODE"                        = "Production"
+        "PLACEHOLDER_DEVELOPERMODE"                         = "false"
+        "PLACEHOLDER_IEF_CLIENTID"                          = ""
+        "PLACEHOLDER_IEFPROXY_CLIENTID"                     = ""
+        "PLACEHOLDER_B2C_EXTENSIONS_APP_CLIENTID"           = ""
+        "PLACEHOLDER_B2C_EXTENSIONS_APP_OBJECTID"           = ""
+
+        "PLACEHOLDER_AAD_COMMON_APP_CLIENTID"               = ""
+        "PLACEHOLDER_AAD_COMMON_APP_SCOPE"                  = "openid profile email"
+        "PLACEHOLDER_AAD_USER_IMPERSONATION_APP_CLIENTID"   = ""
+        "PLACEHOLDER_AAD_USER_IMPERSONATION_APP_SCOPE"      = "openid profile email"
+        "PLACEHOLDER_RESTAPI_URL"                           = "xx.service.com"
+        "PLACEHOLDER_RESTAPI_SCOPE"                         = "xxprodb2c.onmicrosoft.com/<GUID>"
+        "PLACEHOLDER_GRAPHAPI_SCOPE"                        = "graph.onmicrosoft.com"
+        "PLACEHOLDER_SENDGRID_URL"                          = "api.sendgrid.com"
+        "PLACEHOLDER_SENDGRID_NB"                           = "noID123"
+        "PLACEHOLDER_SENDGRID_EN"                           = "enID456"
+        "PLACEHOLDER_SENDGRID_FROM"                         = "no-reply@myCompany.com"
+        "PLACEHOLDER_SENDGRID_TEMPLATE_NB_ID"               = "<uniqueID>"
+        "PLACEHOLDER_SENDGRID_TEMPLATE_EN_ID"               = "<uniqueID>"
+        "PLACEHOLDER_HELPERAPI_URL"                         = ""
+    }
 }
 
 function Invoke-PlaceholderReplace {
@@ -76,15 +146,28 @@ function Invoke-PlaceholderReplace {
 
     $ValidPlaceholders = @(
         "PLACEHOLDER_TENANTNAME"
-        "PLACEHOLDER_TENANTID"
         "PLACEHOLDER_BRANDINGBASEURL"
+        "BRANDING_CONTAINER_NAME"
         "PLACEHOLDER_INSTRUMENTATIONKEY"
+        "PLACEHOLDER_DEPLOYMENTMODE"
+        "PLACEHOLDER_DEVELOPERMODE"
         "PLACEHOLDER_IEF_CLIENTID"
         "PLACEHOLDER_IEFPROXY_CLIENTID"
         "PLACEHOLDER_B2C_EXTENSIONS_APP_CLIENTID"
         "PLACEHOLDER_B2C_EXTENSIONS_APP_OBJECTID"
         "PLACEHOLDER_AAD_COMMON_APP_CLIENTID"
-        "PLACEHOLDER_IDPORTEN_CLIENTID"
+        "PLACEHOLDER_AAD_COMMON_APP_SCOPE"
+        "PLACEHOLDER_AAD_USER_IMPERSONATION_APP_CLIENTID"
+        "PLACEHOLDER_AAD_USER_IMPERSONATION_APP_SCOPE"
+        "PLACEHOLDER_RESTAPI_URL"
+        "PLACEHOLDER_RESTAPI_SCOPE"
+        "PLACEHOLDER_GRAPHAPI_SCOPE"
+        "PLACEHOLDER_SENDGRID_URL"
+        "PLACEHOLDER_SENDGRID_NB"
+        "PLACEHOLDER_SENDGRID_EN"
+        "PLACEHOLDER_SENDGRID_FROM"
+        "PLACEHOLDER_SENDGRID_TEMPLATE_NB_ID"
+        "PLACEHOLDER_SENDGRID_TEMPLATE_EN_ID"
         "PLACEHOLDER_HELPERAPI_URL"
     )
 
@@ -125,7 +208,8 @@ function Invoke-PlaceholderReplace {
         }
         if ($updated -eq $true) {
             Write-Host "Writing updated version of $(Join-Path $DeployFolder $($_.BaseName)).xml"
-            Set-Content -Path "$(Join-Path $DeployFolder $($_.BaseName)).xml" -Value $content -Encoding UTF8
+            # No need to encode XML, but make sure(!!!) policy file is in UTF-8 (*WITHOUT* BOM)
+            Set-Content -Path "$(Join-Path $DeployFolder $($_.BaseName)).xml" -Value $content
         }
     }
 }
